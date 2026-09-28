@@ -30,12 +30,12 @@ const navigation = [
   },
   {
     label: "Stores",
-    path: "/products",
+    path: "/stores",
     icon: Store,
   },
   {
     label: "Alerts",
-    path: "/settings",
+    path: "/alerts",
     icon: Bell,
   },
   {
