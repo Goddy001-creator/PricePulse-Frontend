@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 function formatPrice(value) {
   if (value === null || value === undefined) {
     return "—";
@@ -8,7 +10,10 @@ function formatPrice(value) {
 
 function ProductRow({ product }) {
   return (
-    <div className="product-row">
+    <Link
+      to={`/products/${product.id}`}
+      className="product-row product-row-link"
+    >
       <div className="product-name-cell">
         <div className="product-thumbnail">
           {product.image_url ? (
@@ -27,14 +32,17 @@ function ProductRow({ product }) {
         </div>
       </div>
 
-      <span>{formatPrice(product.current_price)}</span>
+      <span>
+        {formatPrice(product.current_price)}
+      </span>
 
       <span className="old-price">
         {formatPrice(product.old_price)}
       </span>
 
       <span className="discount">
-        {product.discount_percent !== null
+        {product.discount_percent !== null &&
+        product.discount_percent !== undefined
           ? `${product.discount_percent}%`
           : "—"}
       </span>
@@ -42,7 +50,7 @@ function ProductRow({ product }) {
       <span className="rating">
         ★ {product.rating ?? "—"}
       </span>
-    </div>
+    </Link>
   );
 }
 

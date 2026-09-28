@@ -20,6 +20,19 @@ export async function searchProducts(query) {
   return response.data;
 }
 
+export async function getProduct(productId) {
+  const response = await api.get(`/products/${productId}`);
+  return response.data;
+}
+
+export async function getPriceHistory(productId) {
+  const response = await api.get(
+    `/products/${productId}/history`
+  );
+
+  return response.data;
+}
+
 export async function getAnalyticsSummary() {
   const response = await api.get("/analytics/summary");
   return response.data;
