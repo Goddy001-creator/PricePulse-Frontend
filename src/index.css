@@ -2318,3 +2318,140 @@ a {
     flex-direction: column;
   }
 }
+
+/* ========================================
+   PRICEPULSE SPLASH SCREEN
+   ======================================== */
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      rgba(92, 58, 237, 0.22),
+      transparent 36%
+    ),
+    #111827;
+
+  animation: splash-fade-in 0.35s ease-out;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+
+  animation: splash-content-in 0.65s ease-out;
+}
+
+.splash-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 30px;
+}
+
+.splash-logo .logo {
+  transform: scale(1.18);
+  transform-origin: center;
+}
+
+.splash-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  height: 20px;
+  margin-bottom: 18px;
+}
+
+.splash-loader span {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #8b7cf6;
+
+  animation: splash-dot 1.15s infinite ease-in-out;
+}
+
+.splash-loader span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.splash-loader span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.splash-tagline {
+  margin: 0;
+
+  color: #cbd5e1;
+
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+@keyframes splash-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes splash-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .splash-logo {
+    margin-bottom: 24px;
+  }
+
+  .splash-logo .logo {
+    transform: scale(1);
+  }
+
+  .splash-tagline {
+    font-size: 11px;
+  }
+}

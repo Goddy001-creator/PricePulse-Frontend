@@ -4,8 +4,11 @@ import {
   Route,
   Routes,
 } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 import AppLayout from "./components/layout/AppLayout";
+import SplashScreen from "./components/ui/SplashScreen";
+
 import About from "./pages/About";
 import Alerts from "./pages/Alerts";
 import Analytics from "./pages/Analytics";
@@ -16,18 +19,29 @@ import Settings from "./pages/Settings";
 import Stores from "./pages/Stores";
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const splashTimer = window.setTimeout(() => {
+      setShowSplash(false);
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(splashTimer);
+    };
+  }, []);
+
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
           <Route
             path="/"
-            element={
-              <Navigate
-                to="/dashboard"
-                replace
-              />
-            }
+            element={<Navigate to="/dashboard" replace />}
           />
 
           <Route
