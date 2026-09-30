@@ -19,24 +19,33 @@ import Settings from "./pages/Settings";
 import Stores from "./pages/Stores";
 
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    return sessionStorage.getItem("pricepulse_splash_seen") !== "true";
+  });
 
   useEffect(() => {
+    if (!showSplash) {
+      return;
+    }
+
     const splashTimer = window.setTimeout(() => {
+      sessionStorage.setItem(
+        "pricepulse_splash_seen",
+        "true"
+      );
+
       setShowSplash(false);
     }, 1800);
 
     return () => {
       window.clearTimeout(splashTimer);
     };
-  }, []);
-
-  if (showSplash) {
-    return <SplashScreen />;
-  }
+  }, [showSplash]);
 
   return (
     <BrowserRouter>
+      {showSplash && <SplashScreen />}
+
       <Routes>
         <Route element={<AppLayout />}>
           <Route

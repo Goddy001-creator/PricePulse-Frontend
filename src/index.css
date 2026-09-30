@@ -911,7 +911,7 @@ a {
 /* SETTINGS */
 
 .settings-card {
-  max-width: 850px;
+  max-width: 1000px;
   padding: 24px;
 }
 
@@ -2455,3 +2455,167 @@ a {
     font-size: 11px;
   }
 }
+
+/* ========================================
+   DASHBOARD RECENT PRODUCTS LAYOUT FIX
+   ======================================== */
+
+/*
+ * Give the Recently Added Products section
+ * more horizontal space while keeping the
+ * Last Update card compact.
+ */
+.dashboard-grid {
+  grid-template-columns:
+    minmax(0, 2.25fr)
+    minmax(250px, 0.65fr);
+}
+
+/*
+ * Prevent the product table from forcing the
+ * dashboard card beyond its available width.
+ */
+.dashboard-grid > .content-card:first-child {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/*
+ * Dashboard product rows use a slightly tighter
+ * column distribution than the full Products page.
+ */
+.dashboard-grid .product-row {
+  grid-template-columns:
+    minmax(190px, 2.25fr)
+    minmax(82px, 0.9fr)
+    minmax(105px, 1fr)
+    minmax(70px, 0.7fr)
+    minmax(68px, 0.62fr);
+
+  gap: 8px;
+}
+
+/*
+ * Reduce horizontal padding slightly so the
+ * Rating column has enough room to remain inside
+ * the card.
+ */
+.dashboard-grid .product-row.table-heading > span,
+.dashboard-grid .product-row > span:not(.discount):not(.rating) {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+
+.dashboard-grid .product-name-cell {
+  padding-left: 7px;
+  gap: 8px;
+}
+
+/*
+ * Keep the rating comfortably inside its column.
+ */
+.dashboard-grid .rating {
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+/*
+ * Give the product section a little more breathing
+ * room vertically as well.
+ */
+.dashboard-grid > .content-card:first-child {
+  padding: 22px;
+}
+
+/* ========================================
+   DASHBOARD INTERACTIONS & HOVER STATES
+   ======================================== */
+
+/* Stat cards */
+.dashboard-grid ~ * {
+  transition: none;
+}
+
+.stats-grid .stat-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.stats-grid .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.09);
+  border-color: #d8def0;
+}
+
+/* Recently Added Products */
+.dashboard-grid .product-row-link {
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.dashboard-grid .product-row-link:hover {
+  background: #f8faff;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.dashboard-grid .product-row-link:hover .product-name-cell strong {
+  color: var(--primary);
+}
+
+.dashboard-grid .product-row-link:active {
+  background: #f1f5ff;
+}
+
+/* View all products */
+.dashboard-grid .card-heading > a {
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.dashboard-grid .card-heading > a:hover {
+  color: var(--primary-dark);
+  transform: translateX(2px);
+}
+
+/* Last Update card */
+.dashboard-grid .update-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.dashboard-grid .update-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.09);
+  border-color: #d8def0;
+}
+
+/* Backend status pill */
+.dashboard-grid .status-pill {
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.dashboard-grid .update-card:hover .status-pill {
+  transform: translateY(-1px);
+}
+
+/* Product thumbnails */
+.dashboard-grid .product-thumbnail {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.dashboard-grid .product-row-link:hover .product-thumbnail {
+  transform: scale(1.04);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.1);
+}
+
