@@ -1,48 +1,185 @@
 import {
   BarChart3,
+  CheckCircle2,
   Package,
   Percent,
   Store,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import StatCard from "../components/ui/StatCard";
 import ProductRow from "../components/ui/ProductRow";
 import {
   getAnalyticsSummary,
+  getLastUpdate,
+  getPriceTrends,
   getProducts,
+  getStoreSummaries,
 } from "../services/api";
+
+const STORE_COLORS = ["#5c3aed", "#a5b4fc", "#2563eb", "#10b981"];
+const TREND_DAYS = 7;
+
+// Settings will write this key later (15, 30 or 60 minutes)
+function getAutoRefreshMinutes() {
+  try {
+    const saved = Number(localStorage.getItem("pricepulse_auto_refresh"));
+    return [15, 30, 60].includes(saved) ? saved : 30;
+  } catch {
+    return 30;
+  }
+}
+
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatUpdateDate(value) {
+  const date = parseDate(value);
+  if (!date) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatUpdateTime(value) {
+  const date = parseDate(value);
+  if (!date) return "";
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function buildTrendSeries(points, days) {
+  const byDay = new Map(
+    points.map((point) => [point.day, Number(point.avg_change_percent)])
+  );
+
+  const today = new Date();
+  const series = [];
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - i
+    );
+
+    const key = `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+    series.push({
+      label: date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      change: byDay.has(key) ? byDay.get(key) : null,
+    });
+  }
+
+  return series;
+}
 
 function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [products, setProducts] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [trendPoints, setTrendPoints] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const [summaryData, productData] =
-          await Promise.all([
-            getAnalyticsSummary(),
-            getProducts(),
-          ]);
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [summaryData, productData] =
+        await Promise.all([
+          getAnalyticsSummary(),
+          getProducts(),
+        ]);
 
-        setSummary(summaryData);
-        setProducts(productData.products || []);
-      } catch (error) {
-        console.error(
-          "Dashboard loading failed:",
-          error
-        );
-      } finally {
-        setLoading(false);
-      }
+      setSummary(summaryData);
+      setProducts(productData.products || []);
+    } catch (error) {
+      console.error(
+        "Dashboard loading failed:",
+        error
+      );
+    } finally {
+      setLoading(false);
     }
 
-    loadDashboard();
+    const [storesRes, updateRes, trendsRes] = await Promise.allSettled([
+      getStoreSummaries(),
+      getLastUpdate(),
+      getPriceTrends(TREND_DAYS),
+    ]);
+
+    if (storesRes.status === "fulfilled") {
+      setStores(storesRes.value.stores || []);
+    } else {
+      console.error("Top stores loading failed:", storesRes.reason);
+    }
+
+    if (updateRes.status === "fulfilled") {
+      setLastUpdate(updateRes.value?.last_checked || null);
+    } else {
+      console.error("Last update loading failed:", updateRes.reason);
+    }
+
+    if (trendsRes.status === "fulfilled") {
+      setTrendPoints(trendsRes.value.trends || []);
+    } else {
+      console.error("Price trends loading failed:", trendsRes.reason);
+    }
   }, []);
 
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      loadDashboard,
+      getAutoRefreshMinutes() * 60 * 1000
+    );
+
+    return () => window.clearInterval(timer);
+  }, [loadDashboard]);
+
   const recentProducts = products.slice(0, 5);
+
+  const totalStoreProducts = stores.reduce(
+    (sum, store) => sum + Number(store.product_count),
+    0
+  );
+
+  const donutData = stores.map((store) => ({
+    name: store.store_name,
+    value: Number(store.product_count),
+    percent: totalStoreProducts
+      ? Math.round((Number(store.product_count) / totalStoreProducts) * 100)
+      : 0,
+  }));
+
+  const trendSeries = buildTrendSeries(trendPoints, TREND_DAYS);
+  const hasTrendData = trendSeries.some((point) => point.change !== null);
 
   return (
     <div className="page">
@@ -97,7 +234,149 @@ function Dashboard() {
             />
           </section>
 
-          <section className="dashboard-grid">
+          <section className="insights-grid">
+            <div className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>Top Stores</h2>
+                  <p>Share of tracked products</p>
+                </div>
+              </div>
+
+              {donutData.length > 0 ? (
+                <div className="top-stores">
+                  <div className="donut-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donutData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="68%"
+                          outerRadius="98%"
+                          paddingAngle={2}
+                          startAngle={90}
+                          endAngle={-270}
+                          stroke="none"
+                        >
+                          {donutData.map((entry, index) => (
+                            <Cell
+                              key={entry.name}
+                              fill={STORE_COLORS[index % STORE_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+
+                        <Tooltip
+                          formatter={(value, name) => [
+                            `${value} products`,
+                            name,
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="store-legend">
+                    {donutData.map((entry, index) => (
+                      <div className="store-legend-item" key={entry.name}>
+                        <span
+                          className="store-legend-dot"
+                          style={{
+                            background:
+                              STORE_COLORS[index % STORE_COLORS.length],
+                          }}
+                        />
+                        <span>{entry.name}</span>
+                        <strong>{entry.percent}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">No store data yet.</div>
+              )}
+            </div>
+
+            <div className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>Last Update</h2>
+                  <p>Database status</p>
+                </div>
+              </div>
+
+              <div className="last-update-body">
+                <div className="last-update-date">
+                  {formatUpdateDate(lastUpdate)}
+                </div>
+                <div className="last-update-date">
+                  {formatUpdateTime(lastUpdate)}
+                </div>
+
+                <div className="auto-refresh-status">
+                  Auto refresh is ON
+                  <CheckCircle2 size={15} />
+                </div>
+              </div>
+            </div>
+
+            <div className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>Price Trends</h2>
+                  <p>Average price change per day</p>
+                </div>
+              </div>
+
+              {hasTrendData ? (
+                <div className="trend-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={trendSeries}
+                      margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#E2E8F0"
+                      />
+
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        width={42}
+                        tickFormatter={(value) => `${value}%`}
+                      />
+
+                      <Tooltip
+                        formatter={(value) => [
+                          `${value}%`,
+                          "Avg price change",
+                        ]}
+                      />
+
+                      <Line
+                        type="monotone"
+                        dataKey="change"
+                        stroke="#5C3AED"
+                        strokeWidth={2.5}
+                        dot={{ r: 3, fill: "#5C3AED" }}
+                        activeDot={{ r: 5 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  No price changes recorded in the last {TREND_DAYS} days.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
             <div className="content-card">
               <div className="card-heading">
                 <div>
@@ -133,34 +412,6 @@ function Dashboard() {
                     No products found.
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className="content-card update-card">
-              <div className="card-heading">
-                <div>
-                  <h2>Last Update</h2>
-                  <p>Database status</p>
-                </div>
-              </div>
-
-              <div className="update-content">
-                <div className="update-icon">
-                  <Package size={24} />
-                </div>
-
-                <strong>
-                  Price data connected
-                </strong>
-
-                <span>
-                  {summary?.total_products ?? 0} products
-                  currently available.
-                </span>
-
-                <div className="status-pill">
-                  ● Backend connected
-                </div>
               </div>
             </div>
           </section>

@@ -12,6 +12,28 @@ export async function getProducts() {
   return response.data;
 }
 
+export async function getProductsPage({
+  page = 1,
+  perPage = 10,
+  sort = "updated",
+  order = "desc",
+  q = "",
+  store = "",
+} = {}) {
+  const response = await api.get("/products", {
+    params: {
+      page,
+      per_page: perPage,
+      sort,
+      order,
+      q: q || undefined,
+      store: store || undefined,
+    },
+  });
+
+  return response.data;
+}
+
 export async function searchProducts(query) {
   const response = await api.get("/products/search", {
     params: { q: query },
@@ -55,6 +77,32 @@ export async function getStoreProducts(store) {
   const response = await api.get(
     `/analytics/stores/${encodeURIComponent(store)}`
   );
+
+  return response.data;
+}
+
+export async function getPriceDrops(limit = 20) {
+  const response = await api.get("/analytics/price-drops", {
+    params: { limit },
+  });
+
+  return response.data;
+}
+
+export async function getStoreSummaries() {
+  const response = await api.get("/analytics/stores");
+  return response.data;
+}
+
+export async function getLastUpdate() {
+  const response = await api.get("/analytics/last-update");
+  return response.data;
+}
+
+export async function getPriceTrends(days = 7) {
+  const response = await api.get("/analytics/price-trends", {
+    params: { days },
+  });
 
   return response.data;
 }

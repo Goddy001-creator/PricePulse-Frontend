@@ -15,6 +15,7 @@ import Analytics from "./pages/Analytics";
 import Dashboard from "./pages/Dashboard";
 import ProductDetails from "./pages/ProductDetails";
 import Products from "./pages/Products";
+import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import Stores from "./pages/Stores";
 
@@ -81,6 +82,11 @@ function App() {
           <Route
             path="/alerts"
             element={<Alerts />}
+          />
+
+          <Route
+            path="/notifications"
+            element={<Notifications />}
           />
 
           <Route

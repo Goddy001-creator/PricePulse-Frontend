@@ -1,77 +1,183 @@
 import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
   Package,
   RefreshCw,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import ProductRow from "../components/ui/ProductRow";
-import { getProducts, searchProducts } from "../services/api";
+import { getProductsPage } from "../services/api";
 
 const STORE_OPTIONS = ["All Stores", "Jumia", "Konga"];
+const PAGE_SIZE = 10;
+
+// Builds lists like [1, 2, 3] or [1, "start", 4, 5, 6, "end", 13]
+function getPageItems(current, total) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+
+  const items = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+
+  if (start > 2) items.push("start");
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < total - 1) items.push("end");
+
+  items.push(total);
+  return items;
+}
+
+function SortHeader({ label, sortKey, sort, order, onSort }) {
+  const active = sort === sortKey;
+
+  return (
+    <button
+      type="button"
+      className={`sort-header ${active ? "active" : ""}`}
+      onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+    >
+      {label}
+      {active &&
+        (order === "asc" ? (
+          <ArrowUp size={12} />
+        ) : (
+          <ArrowDown size={12} />
+        ))}
+    </button>
+  );
+}
 
 function Products() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = (searchParams.get("q") || "").trim();
+
   const [products, setProducts] = useState([]);
-  const [searchInput, setSearchInput] = useState("");
-  const [activeSearch, setActiveSearch] = useState("");
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [searchInput, setSearchInput] = useState(urlQuery);
   const [storeFilter, setStoreFilter] = useState("All Stores");
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("updated");
+  const [order, setOrder] = useState("desc");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadProducts(searchTerm = "") {
+  const requestRef = useRef(0);
+
+  const filtersActive = Boolean(urlQuery) || storeFilter !== "All Stores";
+
+  const loadProducts = useCallback(async () => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+
     setLoading(true);
     setError("");
 
     try {
-      const data = searchTerm
-        ? await searchProducts(searchTerm)
-        : await getProducts();
+      const data = await getProductsPage({
+        page,
+        perPage: PAGE_SIZE,
+        sort,
+        order,
+        q: urlQuery,
+        store: storeFilter === "All Stores" ? "" : storeFilter,
+      });
+
+      // Ignore answers from outdated requests
+      if (requestId !== requestRef.current) return;
 
       setProducts(data.products || []);
+      setTotal(data.total ?? 0);
+      setTotalPages(data.total_pages ?? 1);
+
+      if (data.total_pages && page > data.total_pages) {
+        setPage(data.total_pages);
+      }
     } catch (requestError) {
+      if (requestId !== requestRef.current) return;
+
       console.error("Products loading failed:", requestError);
       setProducts([]);
+      setTotal(0);
+      setTotalPages(1);
       setError("Unable to load products. Make sure the backend is running.");
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
     }
-  }
+  }, [page, sort, order, urlQuery, storeFilter]);
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [loadProducts]);
+
+  // The URL (?q=...) is the source of truth for the search term
+  useEffect(() => {
+    setSearchInput(urlQuery);
+    setPage(1);
+  }, [urlQuery]);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
 
     const trimmedSearch = searchInput.trim();
-    setActiveSearch(trimmedSearch);
-    loadProducts(trimmedSearch);
+
+    if (trimmedSearch === urlQuery) {
+      if (page === 1) {
+        loadProducts();
+      } else {
+        setPage(1);
+      }
+      return;
+    }
+
+    setSearchParams(trimmedSearch ? { q: trimmedSearch } : {});
   }
 
   function handleClearSearch() {
     setSearchInput("");
-    setActiveSearch("");
-    loadProducts();
+    setSearchParams({});
   }
 
-  function handleRefresh() {
-    loadProducts(activeSearch);
+  function handleStoreChange(value) {
+    setStoreFilter(value);
+    setPage(1);
   }
 
-  const filteredProducts = useMemo(() => {
-    if (storeFilter === "All Stores") {
-      return products;
+  function handleSort(key) {
+    if (sort === key) {
+      setOrder(order === "asc" ? "desc" : "asc");
+    } else {
+      setSort(key);
+      setOrder(key === "name" ? "asc" : "desc");
     }
 
-    return products.filter(
-      (product) =>
-        product.store_name?.toLowerCase() === storeFilter.toLowerCase()
-    );
-  }, [products, storeFilter]);
+    setPage(1);
+  }
+
+  function goToPage(nextPage) {
+    setPage(Math.min(Math.max(1, nextPage), totalPages));
+  }
+
+  const showingFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingTo = Math.min(page * PAGE_SIZE, total);
 
   return (
     <div className="page">
@@ -85,7 +191,7 @@ function Products() {
 
         <button
           className="primary-button"
-          onClick={handleRefresh}
+          onClick={loadProducts}
           disabled={loading}
         >
           <RefreshCw
@@ -129,7 +235,7 @@ function Products() {
 
           <select
             value={storeFilter}
-            onChange={(event) => setStoreFilter(event.target.value)}
+            onChange={(event) => handleStoreChange(event.target.value)}
             aria-label="Filter products by store"
           >
             {STORE_OPTIONS.map((store) => (
@@ -141,14 +247,14 @@ function Products() {
         </div>
       </div>
 
-      {(activeSearch || storeFilter !== "All Stores") && (
+      {filtersActive && (
         <div className="active-filters">
           <div>
             <span>Showing:</span>
 
-            {activeSearch && (
+            {urlQuery && (
               <span className="filter-chip">
-                Search: "{activeSearch}"
+                Search: "{urlQuery}"
                 <button
                   type="button"
                   onClick={handleClearSearch}
@@ -164,7 +270,7 @@ function Products() {
                 Store: {storeFilter}
                 <button
                   type="button"
-                  onClick={() => setStoreFilter("All Stores")}
+                  onClick={() => handleStoreChange("All Stores")}
                   aria-label="Clear store filter"
                 >
                   <X size={13} />
@@ -174,8 +280,8 @@ function Products() {
           </div>
 
           <span className="result-count">
-            {filteredProducts.length} result
-            {filteredProducts.length === 1 ? "" : "s"}
+            {total} result
+            {total === 1 ? "" : "s"}
           </span>
         </div>
       )}
@@ -194,37 +300,34 @@ function Products() {
           <h3>Unable to load products</h3>
           <p>{error}</p>
 
-          <button className="primary-button" onClick={handleRefresh}>
+          <button className="primary-button" onClick={loadProducts}>
             <RefreshCw size={17} />
             Try Again
           </button>
         </div>
-      ) : filteredProducts.length === 0 ? (
+      ) : total === 0 ? (
         <div className="content-card products-empty-card">
           <div className="products-state-icon">
             <Package size={28} />
           </div>
 
           <h3>
-            {activeSearch || storeFilter !== "All Stores"
-              ? "No matching products"
-              : "No products available"}
+            {filtersActive ? "No matching products" : "No products available"}
           </h3>
 
           <p>
-            {activeSearch || storeFilter !== "All Stores"
+            {filtersActive
               ? "Try changing your search or store filter."
               : "PricePulse has not loaded any products yet."}
           </p>
 
-          {(activeSearch || storeFilter !== "All Stores") && (
+          {filtersActive && (
             <button
               className="secondary-button"
               onClick={() => {
-                setSearchInput("");
-                setActiveSearch("");
                 setStoreFilter("All Stores");
-                loadProducts();
+                setPage(1);
+                handleClearSearch();
               }}
             >
               Clear Filters
@@ -237,8 +340,9 @@ function Products() {
             <div>
               <h2>Tracked Products</h2>
               <p>
-                {filteredProducts.length} product
-                {filteredProducts.length === 1 ? "" : "s"} currently shown
+                {total} product
+                {total === 1 ? "" : "s"}{" "}
+                {filtersActive ? "matching" : "currently tracked"}
               </p>
             </div>
 
@@ -250,21 +354,101 @@ function Products() {
 
           <div className="products-table">
             <div className="product-row product-row-header">
-              <span>Product</span>
-              <span>Current Price</span>
+              <SortHeader
+                label="Product"
+                sortKey="name"
+                sort={sort}
+                order={order}
+                onSort={handleSort}
+              />
+
+              <SortHeader
+                label="Current Price"
+                sortKey="price"
+                sort={sort}
+                order={order}
+                onSort={handleSort}
+              />
+
               <span>Original Price</span>
-              <span>Discount</span>
-              <span>Rating</span>
+
+              <SortHeader
+                label="Discount"
+                sortKey="discount"
+                sort={sort}
+                order={order}
+                onSort={handleSort}
+              />
+
+              <SortHeader
+                label="Rating"
+                sortKey="rating"
+                sort={sort}
+                order={order}
+                onSort={handleSort}
+              />
             </div>
 
             <div className="product-row-list">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <ProductRow
                   key={product.id}
                   product={product}
                 />
               ))}
             </div>
+          </div>
+
+          <div className="pagination-bar">
+            <span className="pagination-summary">
+              Showing {showingFrom} to {showingTo} of {total}{" "}
+              {total === 1 ? "product" : "products"}
+            </span>
+
+            {totalPages > 1 && (
+              <nav className="pagination" aria-label="Products pages">
+                <button
+                  type="button"
+                  className="pagination-button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {getPageItems(page, totalPages).map((item) =>
+                  typeof item === "string" ? (
+                    <span key={item} className="pagination-ellipsis">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`pagination-button ${
+                        item === page ? "active" : ""
+                      }`}
+                      onClick={() => goToPage(item)}
+                      aria-label={`Page ${item}`}
+                      aria-current={item === page ? "page" : undefined}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  className="pagination-button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page === totalPages}
+                  aria-label="Next page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </nav>
+            )}
           </div>
         </div>
       )}
